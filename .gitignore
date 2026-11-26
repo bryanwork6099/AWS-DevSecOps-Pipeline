@@ -8,3 +8,10 @@ dist/
 build/
 # Trivy scan reports
 trivy-*.json
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
