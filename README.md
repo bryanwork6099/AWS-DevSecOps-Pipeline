@@ -1,136 +1,169 @@
 # AWS DevSecOps CI/CD Pipeline
 
-A portfolio project demonstrating secure application delivery on AWS
-using GitHub Actions, Docker, Terraform, Checkov, Trivy, Gitleaks,
-Amazon ECR, Amazon ECS Fargate, IAM OIDC federation, and CloudWatch.
+<p align="center">
+  <strong>A Security-Focused CI/CD Pipeline on AWS</strong>
+  <br/>
+  Automating application security, container scanning, infrastructure security, and cloud deployment.
+</p>
 
-> **Project status:** Version 1.0 --- completed and deployed
-> successfully\
-> **AWS Region:** `ap-southeast-1` (Singapore)\
-> **Repository:**
-> https://github.com/bryanwork6099/AWS-DevSecOps-Pipeline
+<p align="center">
+  <img src="https://img.shields.io/badge/AWS-Cloud-orange?logo=amazonaws" alt="AWS"/>
+  <img src="https://img.shields.io/badge/Docker-Containerization-blue?logo=docker" alt="Docker"/>
+  <img src="https://img.shields.io/badge/Terraform-Infrastructure%20as%20Code-7B42BC?logo=terraform" alt="Terraform"/>
+  <img src="https://img.shields.io/badge/GitHub%20Actions-CI%2FCD-2088FF?logo=githubactions" alt="GitHub Actions"/>
+  <img src="https://img.shields.io/badge/Trivy-Security%20Scanning-1904DA" alt="Trivy"/>
+  <img src="https://img.shields.io/badge/Checkov-IaC%20Security-5C4EE5" alt="Checkov"/>
+</p>
 
-## 1. Project overview
+<p align="center">
+  <img src="https://img.shields.io/badge/Project%20Status-Completed-success" alt="Project completed"/>
+  <img src="https://img.shields.io/badge/Version-1.0-blue" alt="Version 1.0"/>
+  <img src="https://img.shields.io/badge/AWS%20Region-ap--southeast--1-orange" alt="AWS Singapore"/>
+</p>
 
-This project implements a security-focused CI/CD workflow for a
-containerized Python Flask application. On pushes to `main` and pull
-requests targeting `main`, GitHub Actions runs infrastructure and
-application security checks, builds the Docker image, and scans it for
-vulnerabilities.
+---
 
-For pushes to `main`, the workflow authenticates to AWS using GitHub's
-OIDC identity provider and a restricted IAM role, then publishes the
-image to Amazon ECR.
+## Table of Contents
 
-The application is deployed separately on Amazon ECS using AWS Fargate.
-Terraform manages the selected AWS infrastructure resources, while
-Checkov scans the Terraform configuration for security
-misconfigurations.
+1. [Project Overview](#1-project-overview)
+2. [Architecture](#2-architecture)
+3. [Technology Stack](#3-technology-stack)
+4. [Repository Structure](#4-repository-structure)
+5. [Application](#5-application)
+6. [Docker Container Security](#6-docker-container-security)
+7. [CI/CD Pipeline](#7-cicd-pipeline)
+8. [Security Results](#8-security-results)
+9. [GitHub-to-AWS Authentication](#9-github-to-aws-authentication)
+10. [AWS Deployment](#10-aws-deployment)
+11. [Terraform Infrastructure](#11-terraform-infrastructure)
+12. [Reproduction Guide](#12-reproduction-guide)
+13. [Cost Management](#13-cost-management)
+14. [Limitations and Future Improvements](#14-limitations-and-future-improvements)
+15. [Project Completion](#15-project-completion)
 
-### Project goals
+---
 
--   Integrate security checks into the CI/CD workflow.
--   Detect exposed secrets before application delivery.
--   Scan application dependencies, the filesystem, and the Docker image.
--   Scan Terraform infrastructure configuration for security issues.
--   Authenticate GitHub Actions to AWS without storing long-lived AWS
-    access keys in GitHub.
--   Publish immutable container images to Amazon ECR.
--   Run a hardened container on Amazon ECS Fargate.
--   Manage selected infrastructure resources through Terraform.
--   Send container logs to Amazon CloudWatch.
+## 1. Project Overview
+
+### Objective
+
+Design and implement a security-focused CI/CD pipeline that automates application security scanning, Docker image building, infrastructure security assessment, and container image publishing to AWS.
+
+The project demonstrates how security practices can be integrated throughout the application delivery process using DevSecOps principles.
+
+### Key Objectives
+
+- Integrate automated security checks into CI/CD.
+- Detect exposed secrets before application delivery.
+- Scan application dependencies, filesystems, and Docker images.
+- Identify infrastructure misconfigurations using Checkov.
+- Implement secure GitHub-to-AWS authentication using OIDC.
+- Publish immutable Docker images to Amazon ECR.
+- Deploy a hardened containerized application using Amazon ECS Fargate.
+- Manage selected AWS infrastructure using Terraform.
+- Centralize application logs using Amazon CloudWatch.
+
+### Project Repository
+
+**GitHub:** [AWS-DevSecOps-Pipeline](https://github.com/bryanwork6099/AWS-DevSecOps-Pipeline)
+
+**Project status:** Completed — Version 1.0
+
+---
 
 ## 2. Architecture
 
-``` text
-Developer
-   |
-   v
-GitHub repository
-   |
-   v
-GitHub Actions
-   |
-   +--> Checkov: Terraform security scan
-   |
-   +--> Gitleaks: secret detection
-   |
-   +--> Trivy: filesystem scan
-   |
-   +--> Docker build
-   |
-   +--> Trivy: image vulnerability scan
-   |
-   +--> GitHub OIDC -> AWS IAM role
-   |
-   +--> Amazon ECR: publish image (push to main only)
-                              |
-                              v
-                     Amazon ECS Fargate
-                              |
-                              v
-                     Amazon CloudWatch Logs
+### High-Level Architecture
+
+```text
+                  DEVELOPER
+                      |
+                      v
+              GITHUB REPOSITORY
+                      |
+                      v
+               GITHUB ACTIONS
+                      |
+          +-----------+-----------+
+          |           |           |
+          v           v           v
+       Checkov     Gitleaks     Trivy
+       Terraform    Secrets    Filesystem
+          |           |           |
+          +-----------+-----------+
+                      |
+                      v
+                 DOCKER BUILD
+                      |
+                      v
+                TRIVY IMAGE SCAN
+                      |
+                      v
+              GITHUB OIDC FEDERATION
+                      |
+                      v
+                  AWS IAM ROLE
+                      |
+                      v
+                 AMAZON ECR
+                Image Registry
+                      |
+                      v
+              AMAZON ECS FARGATE
+                      |
+                      v
+              AMAZON CLOUDWATCH
+                 Container Logs
 ```
 
-**Deployment distinction:** The current GitHub Actions workflow builds,
-scans, and publishes images to ECR. ECS Fargate deployment was
-provisioned and verified separately using Terraform and the AWS
-console/CLI. The workflow does not currently perform an automatic ECS
-service update after each image push.
+### Deployment Workflow
 
-## 3. Technology stack
+The GitHub Actions pipeline automatically:
 
-  -----------------------------------------------------------------------
-  Area                    Technology              Purpose
-  ----------------------- ----------------------- -----------------------
-  Application             Python, Flask           Simple HTTP application
-                                                  and health endpoint
+1. Checks out the repository.
+2. Scans Terraform configuration using Checkov.
+3. Detects exposed secrets using Gitleaks.
+4. Scans the filesystem using Trivy.
+5. Builds the Docker image.
+6. Scans the Docker image using Trivy.
+7. Authenticates to AWS using GitHub OIDC.
+8. Logs in to Amazon ECR.
+9. Publishes the Docker image to ECR.
 
-  Containerization        Docker                  Package the application
-                                                  and runtime
+**Deployment note:** ECS Fargate was provisioned and verified separately using Terraform and AWS console/CLI operations. The current GitHub Actions workflow publishes images to ECR but does not automatically update the ECS service after each image push.
 
-  CI/CD                   GitHub Actions          Automate validation,
-                                                  security scanning,
-                                                  build, and image
-                                                  publishing
+---
 
-  Secret detection        Gitleaks                Detect accidentally
-                                                  committed secrets
+## 3. Technology Stack
 
-  Vulnerability scanning  Trivy                   Scan filesystem and
-                                                  container image
-                                                  vulnerabilities
+| Category | Technology | Purpose |
+|---|---|---|
+| Application | Python, Flask | Web application |
+| Containerization | Docker | Application containerization |
+| CI/CD | GitHub Actions | Pipeline automation |
+| Secret Detection | Gitleaks | Detect exposed credentials |
+| Vulnerability Scanning | Trivy | Filesystem and image scanning |
+| IaC Security | Checkov | Terraform security scanning |
+| Infrastructure as Code | Terraform | AWS infrastructure management |
+| Container Registry | Amazon ECR | Docker image storage |
+| Container Deployment | Amazon ECS Fargate | Container execution |
+| Identity and Access | AWS IAM, OIDC | Secure federated authentication |
+| Monitoring | Amazon CloudWatch | Container logs |
 
-  IaC security            Checkov                 Detect Terraform
-                                                  security
-                                                  misconfigurations
+---
 
-  Infrastructure as Code  Terraform               Manage selected AWS
-                                                  resources
+## 4. Repository Structure
 
-  Container registry      Amazon ECR              Store Docker images
-
-  Container runtime       Amazon ECS Fargate      Run the container
-                                                  without managing EC2
-                                                  hosts
-
-  Identity                AWS IAM and GitHub OIDC Federated, short-lived
-                                                  AWS credentials
-
-  Logging                 Amazon CloudWatch Logs  Collect
-                                                  application/container
-                                                  logs
-  -----------------------------------------------------------------------
-
-## 4. Repository structure
-
-``` text
+```text
 AWS-DevSecOps-Pipeline/
+│
 ├── app/
 │   ├── __init__.py
 │   └── main.py
+│
 ├── tests/
 │   └── test_main.py
+│
 ├── terraform/
 │   ├── .terraform.lock.hcl
 │   ├── main.tf
@@ -138,9 +171,11 @@ AWS-DevSecOps-Pipeline/
 │   ├── providers.tf
 │   ├── terraform.tf
 │   └── variables.tf
+│
 ├── .github/
 │   └── workflows/
 │       └── security.yml
+│
 ├── .gitleaks.toml
 ├── .dockerignore
 ├── .gitignore
@@ -149,370 +184,421 @@ AWS-DevSecOps-Pipeline/
 └── requirements.txt
 ```
 
-Terraform's local `.terraform/` directory and state files are
-intentionally excluded from Git.
+> **Note:** Terraform's local `.terraform/` directory and state files are excluded from Git to avoid committing provider binaries and potentially sensitive infrastructure state.
+
+---
 
 ## 5. Application
 
-The Flask application exposes two endpoints:
+The project uses a Python Flask application with two HTTP endpoints.
 
-  -------------------------------------------------------------------------
-  Endpoint                Purpose                 Expected result
-  ----------------------- ----------------------- -------------------------
-  `/`                     Application information JSON response showing the
-                                                  application is running
+| Endpoint | Description | Expected Result |
+|---|---|---|
+| `/` | Application information | HTTP 200 |
+| `/health` | Application health check | HTTP 200 |
 
-  `/health`               Health check            HTTP 200 with
-                                                  `{"status": "healthy"}`
-  -------------------------------------------------------------------------
+### Run Locally
 
-The application listens on port `5000`.
+Install dependencies:
 
-### Run locally
-
-Install the Python dependencies:
-
-``` powershell
+```powershell
 python -m pip install -r requirements.txt
 ```
 
-Run the Flask application:
+Start the application:
 
-``` powershell
+```powershell
 python app/main.py
 ```
 
-Test the endpoints from another PowerShell window:
+Test the endpoints:
 
-``` powershell
+```powershell
 Invoke-RestMethod http://localhost:5000/
 Invoke-RestMethod http://localhost:5000/health
 ```
 
-## 6. Docker container hardening
+---
 
-The Docker image uses `python:3.13-slim` and includes several runtime
-hardening measures:
+## 6. Docker Container Security
 
--   Installs available Debian security updates during the image build.
--   Installs only the Python application dependencies.
--   Removes pip from the final runtime image after dependency
-    installation.
--   Runs the application as a dedicated non-root user (`appuser`).
--   Uses a read-only root filesystem when deployed in ECS.
--   Defines a Docker health check against `/health`.
--   Uses Gunicorn as the production WSGI server.
--   Configures Gunicorn's worker temporary directory as `/dev/shm` so it
-    can operate with the ECS read-only root filesystem.
+The application is containerized using `python:3.13-slim`.
 
-Build and run locally:
+### Implemented Security Controls
 
-``` powershell
+| Security Control | Implementation |
+|---|---|
+| Minimal base image | Python slim image |
+| Non-root execution | Dedicated `appuser` |
+| Read-only filesystem | ECS `readonlyRootFilesystem` |
+| Health monitoring | Docker HEALTHCHECK |
+| Production server | Gunicorn |
+| Runtime hardening | pip removed after dependency installation |
+| Writable temporary storage | Gunicorn worker directory configured to `/dev/shm` |
+
+### Build and Run Docker Image
+
+```powershell
 docker build -t devsecops-app:local .
+```
+
+```powershell
 docker run --rm -p 5000:5000 devsecops-app:local
 ```
 
-Test the container:
+Verify the application:
 
-``` powershell
+```powershell
 Invoke-RestMethod http://localhost:5000/
 Invoke-RestMethod http://localhost:5000/health
 ```
 
-The Trivy image scan was configured to fail on HIGH and CRITICAL
-findings while ignoring unfixed findings. This does not mean all
-vulnerabilities are absent: unfixed findings are filtered from the
-pipeline's failure condition and should still be reviewed periodically.
+**Security consideration:** The Trivy pipeline fails on applicable HIGH and CRITICAL findings while using `ignore-unfixed: true`. Unfixed vulnerabilities are excluded from the failure condition, not proven absent. Scan results should still be reviewed.
 
-## 7. CI/CD workflow
+---
 
-Workflow file: `.github/workflows/security.yml`
+## 7. CI/CD Pipeline
 
-The workflow runs for:
+**Workflow:** `.github/workflows/security.yml`
 
--   Pushes to the `main` branch.
--   Pull requests targeting the `main` branch.
+The pipeline is triggered by:
 
-### Pipeline stages
+- Pushes to `main`.
+- Pull requests targeting `main`.
 
-1.  **Checkout repository** --- retrieves the source code.
-2.  **Checkov Terraform scan** --- scans the `terraform/` directory
-    using `bridgecrew/checkov:3.4.11`.
-3.  **Gitleaks secret detection** --- checks the repository for exposed
-    secrets.
-4.  **Trivy filesystem scan** --- scans the repository filesystem for
-    vulnerabilities and misconfigurations.
-5.  **Docker image build** --- builds the Flask application image.
-6.  **Trivy image scan** --- scans the built image for HIGH and CRITICAL
-    vulnerabilities.
-7.  **AWS OIDC authentication** --- on pushes to `main`, assumes the
-    configured AWS IAM role.
-8.  **Amazon ECR login** --- authenticates Docker to ECR.
-9.  **Push image to ECR** --- tags the image with the full Git commit
-    SHA and pushes it to the repository.
+### Pipeline Stages
 
-AWS authentication and ECR publishing are conditional on a push to
-`main`. Pull requests run the security checks and image build but do not
-publish to ECR.
+| Stage | Tool | Function |
+|---|---|---|
+| 1 | GitHub Checkout | Retrieve source code |
+| 2 | Checkov | Scan Terraform configuration |
+| 3 | Gitleaks | Detect exposed secrets |
+| 4 | Trivy | Scan filesystem |
+| 5 | Docker | Build application image |
+| 6 | Trivy | Scan Docker image |
+| 7 | AWS OIDC | Authenticate to AWS |
+| 8 | Amazon ECR Login | Authenticate Docker to ECR |
+| 9 | Amazon ECR Push | Publish container image |
 
-### Security scan settings
+### Pipeline Execution Conditions
 
-The Trivy steps use:
+| Workflow Event | Security Scanning | Docker Build | ECR Publishing |
+|---|---|---|---|
+| Push to `main` | Yes | Yes | Yes |
+| Pull request to `main` | Yes | Yes | No |
 
--   `severity: HIGH,CRITICAL`
--   `ignore-unfixed: true`
--   `exit-code: '1'`
+AWS authentication and ECR publishing are restricted to pushes to `main`.
 
-The workflow therefore fails when the configured scan detects applicable
-HIGH or CRITICAL findings. Review the complete scan output and
-understand the effect of `ignore-unfixed` when interpreting results.
+### Trivy Configuration
 
-### Checkov result
+Both Trivy scans use:
 
-The final local Checkov scan reported:
+```yaml
+severity: HIGH,CRITICAL
+ignore-unfixed: true
+exit-code: '1'
+```
 
-  Result                                 Count
-  ------------------------------------ -------
-  Passed                                    10
-  Failed                                     0
-  Skipped with documented exceptions         4
+This causes the pipeline to fail when the configured scan identifies applicable HIGH or CRITICAL findings.
 
-The four skips are documented risk/cost decisions in the Terraform
-configuration:
+---
 
--   **CKV_AWS_136:** ECR uses AWS-managed AES-256 encryption rather than
-    a customer-managed KMS key to avoid additional key costs.
--   **CKV_AWS_224:** ECS Exec is intentionally disabled; application
-    logs are sent to CloudWatch using the `awslogs` driver.
--   **CKV_AWS_65:** Container Insights is disabled to limit monitoring
-    costs for this small portfolio workload.
--   **CKV_AWS_333:** Public IP assignment is retained for this low-cost
-    deployment. Inbound application access is restricted by the security
-    group to the administrator's public IP. A
-    private-subnet/load-balancer architecture is deferred.
+## 8. Security Results
 
-Skipped checks are documented exceptions, not passing checks. Reassess
-these decisions before using the architecture for production workloads.
+### Checkov — Terraform Security Scan
 
-## 8. GitHub-to-AWS authentication with OIDC
+<details>
+<summary><strong>View Checkov results</strong></summary>
 
-GitHub Actions authenticates to AWS through the GitHub OIDC provider and
-the IAM role `GitHubActions-ECR-PushRole`.
+| Result | Count |
+|---|---:|
+| Passed | 10 |
+| Failed | 0 |
+| Skipped | 4 |
 
-The role trust policy is restricted to the intended GitHub repository
-and `main` branch subject, with the audience `sts.amazonaws.com`.
+**Documented exceptions:**
 
-The role's permissions are limited to:
+| Check ID | Reason |
+|---|---|
+| CKV_AWS_136 | AWS-managed AES-256 ECR encryption is used instead of a customer-managed KMS key to avoid additional key costs. |
+| CKV_AWS_224 | ECS Exec is intentionally disabled. Application logs are sent to CloudWatch. |
+| CKV_AWS_65 | Container Insights is disabled to limit monitoring costs. |
+| CKV_AWS_333 | Public IP assignment is retained for this low-cost portfolio deployment. Inbound TCP 5000 is restricted to the administrator's public IP. |
 
--   `ecr:GetAuthorizationToken` for registry authentication.
--   Required image upload and publication actions on the project's ECR
-    repository.
+These are documented exceptions, not passed security checks. Reassess them before production use.
 
-This avoids storing long-lived AWS access keys as GitHub repository
-secrets. The workflow reads the role ARN from the GitHub repository
-variable `AWS_ROLE_ARN`.
+</details>
 
-Before reusing this setup in another repository, update the OIDC trust
-policy, repository subject, role ARN, region, and ECR repository
-details.
+### Security Controls Summary
 
-## 9. AWS deployment
+| Security Area | Implementation |
+|---|---|
+| Secret Detection | Gitleaks |
+| Vulnerability Assessment | Trivy |
+| Infrastructure Security | Checkov |
+| AWS Authentication | GitHub OIDC |
+| IAM Permissions | Restricted ECR publishing permissions |
+| Image Integrity | Immutable ECR tags |
+| Container Privileges | Non-root execution |
+| Filesystem Protection | Read-only root filesystem |
+| Health Monitoring | Docker health check |
+| Network Security | Restricted inbound access |
 
-### AWS resources
+---
 
-The project was deployed in `ap-southeast-1` (Singapore).
+## 9. GitHub-to-AWS Authentication
 
-  Resource                               Name / configuration
-  -------------------------------------- --------------------------
-  ECR repository                         `aws-devsecops-pipeline`
-  ECS cluster                            `devsecops-cluster`
-  ECS service                            `devsecops-service`
-  Task definition family                 `devsecops-task`
-  Container name                         `devsecops-app`
-  Container port                         `5000`
-  CloudWatch log group                   `/ecs/devsecops-task`
-  ECS launch type                        Fargate
-  Task CPU / memory                      256 CPU units / 512 MiB
-  Task operating system / architecture   Linux / X86_64
+GitHub Actions authenticates to AWS through GitHub's OIDC identity provider.
 
-The ECS task uses the existing `ecsTaskExecutionRole`. No separate
-application task role is configured for this simple application.
+### IAM Configuration
 
-### Container settings
+**IAM Role:** `GitHubActions-ECR-PushRole`
 
--   `readonlyRootFilesystem` is enabled.
--   The container runs as a non-root user.
--   The container uses port `5000`.
--   Container logs are sent to `/ecs/devsecops-task` using the `awslogs`
-    log driver.
--   ECS Exec is disabled.
--   The ECS service has a deployment circuit breaker with rollback
-    enabled.
+The role trust policy restricts access to the intended GitHub repository and `main` branch, with the audience:
 
-### Network configuration and limitations
+```text
+sts.amazonaws.com
+```
 
-The initial portfolio deployment uses existing VPC/subnet resources and
-a security group rather than creating a new network. The task receives a
-public IP in public subnets. Inbound TCP port `5000` is restricted to
-the administrator's public IP address, and outbound TCP `443` is
-allowed.
+### IAM Permissions
 
-This is a cost-conscious demonstration setup, not a production reference
-architecture. The public-IP design, lack of an HTTPS load balancer, and
-administrator-IP allow-list should be reconsidered before broader use. A
-task public IP can change after replacement or redeployment.
+The role has permissions required for:
 
-### Deployment verification
+- `ecr:GetAuthorizationToken`
+- `ecr:BatchCheckLayerAvailability`
+- `ecr:InitiateLayerUpload`
+- `ecr:UploadLayerPart`
+- `ecr:CompleteLayerUpload`
+- `ecr:PutImage`
 
-The deployed service was verified with:
+Image publishing permissions are scoped to the project's ECR repository, while the authorization token action requires `Resource: "*"`.
 
--   ECS service status `ACTIVE`.
--   Desired task count `1`.
--   Running task count `1`.
--   Pending task count `0`.
--   Deployment rollout status `COMPLETED`.
--   Successful HTTP response from `/`.
--   Successful health response from `/health`.
--   Gunicorn startup and HTTP 200 request entries in CloudWatch Logs.
+The workflow uses the GitHub repository variable:
 
-The verified task definition was revision 5 at the time of project
-completion. Runtime IP addresses and task revisions can change over
-time.
+```text
+AWS_ROLE_ARN
+```
 
-## 10. Terraform
+**Security benefit:** No long-lived AWS access keys are stored in GitHub for this workflow. GitHub obtains temporary AWS credentials through OIDC federation.
 
-Terraform configuration is stored in `terraform/`:
+---
 
--   `terraform.tf` --- Terraform and AWS provider version requirements.
--   `providers.tf` --- AWS provider configuration.
--   `variables.tf` --- configurable deployment variables.
--   `main.tf` --- data sources and managed ECR/ECS resources.
--   `outputs.tf` --- useful Terraform outputs.
--   `.terraform.lock.hcl` --- provider dependency lock file.
+## 10. AWS Deployment
 
-The configuration references existing VPC, subnet, security group, and
-ECS execution role resources through data sources. It manages selected
-resources including the ECR repository, ECS cluster, task definition,
-and ECS service.
+### AWS Resources
 
-### Validate and plan
+**Region:** `ap-southeast-1` — Singapore
 
-From the repository root:
+| AWS Resource | Configuration |
+|---|---|
+| Amazon ECR | `aws-devsecops-pipeline` |
+| ECS Cluster | `devsecops-cluster` |
+| ECS Service | `devsecops-service` |
+| Task Definition | `devsecops-task` |
+| Container | `devsecops-app` |
+| Container Port | `5000` |
+| CloudWatch Log Group | `/ecs/devsecops-task` |
+| Launch Type | Fargate |
+| CPU | 256 |
+| Memory | 512 MiB |
+| Operating System | Linux |
+| Architecture | X86_64 |
 
-``` powershell
+### ECS Container Configuration
+
+- Read-only root filesystem enabled.
+- Non-root container execution.
+- CloudWatch logging enabled.
+- ECS Exec disabled.
+- Deployment circuit breaker and rollback enabled.
+- Existing ECS execution role reused.
+
+### Network Configuration
+
+The deployment uses existing VPC and subnet resources.
+
+| Network Setting | Configuration |
+|---|---|
+| Subnet Type | Public |
+| Public IP | Enabled |
+| Inbound | TCP 5000 from administrator public IP |
+| Outbound | TCP 443 to `0.0.0.0/0` |
+
+> **Architecture limitation:** This is a cost-conscious portfolio deployment, not a production network design. The application uses a public IP and does not have an HTTPS Application Load Balancer. A private-subnet architecture with appropriate egress and HTTPS termination is a potential future improvement.
+
+### Deployment Verification
+
+The ECS deployment was successfully verified.
+
+| Verification | Result |
+|---|---|
+| ECS Service Status | ACTIVE |
+| Desired Tasks | 1 |
+| Running Tasks | 1 |
+| Pending Tasks | 0 |
+| Deployment Rollout | COMPLETED |
+| Application Endpoint | HTTP 200 |
+| Health Endpoint | Healthy |
+| CloudWatch Logs | Verified |
+
+The verified task definition was revision 5 at project completion. Task revisions and public IP addresses may change during future deployments.
+
+---
+
+## 11. Terraform Infrastructure
+
+Terraform configuration is maintained in the `terraform/` directory.
+
+| File | Purpose |
+|---|---|
+| `terraform.tf` | Terraform and provider requirements |
+| `providers.tf` | AWS provider configuration |
+| `variables.tf` | Input variables |
+| `main.tf` | AWS data sources and managed resources |
+| `outputs.tf` | Terraform outputs |
+| `.terraform.lock.hcl` | Provider dependency lock file |
+
+The configuration references existing VPC, subnet, security group, and ECS execution role resources. Selected ECR and ECS resources are managed through Terraform.
+
+### Terraform Validation
+
+Run from the repository root:
+
+```powershell
 terraform -chdir=terraform init
 terraform -chdir=terraform fmt -check
 terraform -chdir=terraform validate
 terraform -chdir=terraform plan
 ```
 
-Review a plan carefully before applying it:
+Apply only after reviewing the plan:
 
-``` powershell
+```powershell
 terraform -chdir=terraform apply
 ```
 
-Do not run `apply` against an unfamiliar or newly initialized state. The
-existing resources were imported into Terraform state during this
-project. A new clone does not contain that local state, and blindly
-applying from an empty state can attempt to create duplicate resources
-or change existing infrastructure.
+> **Important:** The original deployment resources were imported into Terraform state. A fresh clone does not include that local state. Do not run `terraform apply` from an empty state without first planning the resource adoption/import process. Otherwise, Terraform may attempt to create duplicate resources or modify existing infrastructure.
 
-### Terraform state handling
+### Terraform State Security
 
-The following files/directories are intentionally ignored by Git:
+The following are excluded from Git:
 
--   `.terraform/`
--   `*.tfstate`
--   `*.tfstate.*`
--   `*.tfplan`
+```gitignore
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+```
 
-Terraform state may contain sensitive infrastructure information. For
-collaborative or long-term use, configure a secure remote backend with
-appropriate access control, encryption, and state locking. Back up state
-before making backend or state-management changes.
+Terraform state may contain sensitive infrastructure information. For long-term or collaborative use, consider a secure remote backend with encryption, access control, and state locking.
 
-## 11. Reproduce or adapt the project
+---
 
-Before running this project in another AWS account or region:
+## 12. Reproduction Guide
 
-1.  Install Git, Docker, AWS CLI, and Terraform.
-2.  Configure AWS CLI credentials for local administrative operations.
-3.  Review and update the resource IDs in `terraform/main.tf` to match
-    the target environment.
-4.  Review the security group, subnet, VPC, and IAM execution role
-    references.
-5.  Configure the GitHub OIDC identity provider and a least-privilege
-    IAM role.
-6.  Set the GitHub repository variable `AWS_ROLE_ARN`.
-7.  Confirm the ECR repository name, AWS region, and account-specific
-    image URI used by the workflow and task definition.
-8.  Initialize Terraform and import existing resources when adopting an
-    already-deployed environment.
-9.  Run Terraform validation, planning, and Checkov scanning.
-10. Run the GitHub Actions workflow and verify the published ECR image.
-11. Deploy or update the ECS task definition/service and verify both
-    application endpoints.
+To reproduce or adapt the project:
 
-Never commit AWS credentials, Terraform state, `.env` files, or other
-secrets to the repository.
+1. Install Git, Docker, AWS CLI, and Terraform.
+2. Configure AWS CLI credentials for local administration.
+3. Review the resource IDs in `terraform/main.tf`.
+4. Update VPC, subnet, security group, and IAM role references for the target AWS environment.
+5. Configure GitHub OIDC federation and a least-privilege IAM role.
+6. Set the GitHub repository variable `AWS_ROLE_ARN`.
+7. Confirm the AWS region, account ID, ECR repository name, and image URI.
+8. Initialize Terraform and import existing resources where applicable.
+9. Run Terraform validation, planning, and Checkov.
+10. Execute the GitHub Actions pipeline.
+11. Verify the image in Amazon ECR.
+12. Deploy or update the ECS task definition and service.
+13. Test the application and health endpoints.
+14. Verify application logs in CloudWatch.
 
-## 12. Cost management and cleanup
+**Never commit AWS credentials, `.env` files, Terraform state, or other secrets to GitHub.**
 
-AWS resources may incur charges while the project is idle. In
-particular, Fargate tasks, CloudWatch log ingestion/storage, and other
-retained AWS resources may create ongoing costs.
+---
 
-To pause the application while retaining the project:
+## 13. Cost Management
 
--   Set the ECS service desired count to `0`.
--   Keep the source code and ECR repository if you want to preserve the
-    image.
--   Review CloudWatch log retention.
--   Review the AWS Billing console and Cost Explorer for other billable
-    resources.
+AWS resources may continue generating charges while the project is idle.
 
-To permanently remove the deployment, first review Terraform state and
-the destruction plan. Understand which resources are managed by
-Terraform and which are shared/external resources. Do not delete shared
-VPCs, subnets, security groups, IAM roles, or other resources that may
-be used by unrelated workloads. Back up state before any teardown.
+Potential cost sources include:
 
-## 13. Known limitations and future improvements
+- ECS Fargate tasks.
+- CloudWatch log ingestion and storage.
+- Retained ECR images and storage.
+- Other AWS resources associated with the deployment.
 
-The Version 1.0 project is complete for portfolio demonstration, with
-the following improvements intentionally left for a future iteration:
+### Pause the Application
 
--   Automate ECS task-definition registration and service deployment
-    after a successful ECR push.
--   Introduce HTTPS through an Application Load Balancer and a managed
-    certificate.
--   Move ECS tasks into private subnets and use appropriate egress
-    infrastructure.
--   Add CloudWatch alarms and notifications.
--   Add deployment/rollback testing and operational runbooks.
--   Consider a remote Terraform backend and stronger separation of
-    environments.
--   Revisit the four documented Checkov exceptions as requirements and
-    budget change.
+To preserve the project while reducing compute costs:
 
-These are future enhancements, not claims that the current project
-already implements them.
+- Set ECS service desired count to `0`.
+- Retain the ECR repository and GitHub source code.
+- Review CloudWatch log retention.
+- Review AWS Billing and Cost Explorer.
 
-## 14. Project completion summary
+### Permanent Cleanup
 
-Version 1.0 demonstrates a complete security-focused application build
-and image-publishing workflow, AWS OIDC federation, Terraform-managed
-AWS resources, and a separately deployed and verified ECS Fargate
-application.
+Before removing resources:
 
-The final GitHub Actions run for commit `d1bccde` completed
-successfully. The project is suitable as a cloud security / DevSecOps
-portfolio demonstration, provided its deployment limitations and
-documented security trade-offs are understood.
+1. Review Terraform state.
+2. Review the Terraform destruction plan.
+3. Identify resources managed by Terraform.
+4. Identify shared or externally managed resources.
+5. Back up Terraform state.
 
-------------------------------------------------------------------------
+Do not delete shared VPCs, subnets, security groups, IAM roles, or other resources that may support unrelated workloads.
 
-**Author:** Project portfolio\
-**Project:** AWS DevSecOps CI/CD Pipeline\
-**Status:** Completed --- Version 1.0
+---
+
+## 14. Limitations and Future Improvements
+
+The current Version 1.0 implementation is complete for portfolio demonstration.
+
+Potential future enhancements include:
+
+| Area | Improvement |
+|---|---|
+| CI/CD | Automate ECS deployment after successful ECR publishing |
+| Network Security | Move ECS tasks into private subnets |
+| HTTPS | Add an Application Load Balancer and managed certificate |
+| Monitoring | Add CloudWatch alarms and notifications |
+| Reliability | Test deployment rollback and recovery |
+| Terraform | Introduce a secure remote state backend |
+| Security | Reassess documented Checkov exceptions |
+
+These are future enhancements and are not currently implemented in Version 1.0.
+
+---
+
+## 15. Project Completion
+
+### Final Project Status
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Completed-success?style=for-the-badge" alt="Completed"/>
+</p>
+
+This project demonstrates practical experience in:
+
+- DevSecOps and CI/CD pipeline implementation.
+- Automated application and infrastructure security scanning.
+- Docker containerization and hardening.
+- AWS IAM and OIDC federation.
+- Infrastructure as Code using Terraform.
+- Amazon ECR and ECS Fargate deployment.
+- CloudWatch logging and application verification.
+
+**Final GitHub Actions run:** Successful  
+**Final documented commit:** `d1bccde`  
+**Project version:** 1.0
+
+---
+
+<p align="center">
+  <strong>AWS DevSecOps CI/CD Pipeline</strong>
+  <br/>
+  <sub>Completed Portfolio Project — Version 1.0</sub>
+</p>
